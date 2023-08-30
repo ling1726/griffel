@@ -1,12 +1,18 @@
 /** bundle.css **/
-.fcnqdeg {
-  background-color: green;
+@layer d {
+  .fcnqdeg {
+    background-color: green;
+  }
 }
 /** chunkA.css **/
-.fe3e8s9 {
-  color: red;
+@layer d {
+  .fe3e8s9 {
+    color: red;
+  }
 }
 /** chunkB.css **/
-.fe3e8s9 {
-  color: red;
+@layer d {
+  .fe3e8s9 {
+    color: red;
+  }
 }

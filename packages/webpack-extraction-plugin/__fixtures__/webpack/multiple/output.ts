@@ -11,4 +11,4 @@ export const stylesB = _css({
   },
 });
 
-import './code.griffel.css!=!../../../virtual-loader/index.js!./code.ts?safe';
+import './code.griffel.css!=!../../../virtual-loader/index.js!./code.ts';

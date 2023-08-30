@@ -301,10 +301,6 @@ describe('GriffelCSSExtractionPlugin', () => {
   // Custom filenames in mini-css-extract-plugin
   testFixture('config-name', { cssFilename: '[name].[contenthash].css' });
 
-  // TODO
-  testFixture('config-code-split', {
-    pluginOptions: { experimental_enableCssChunks: true },
-  });
   testFixture('config-code-split-chunks', {
     pluginOptions: { experimental_enableCssChunks: true },
   });

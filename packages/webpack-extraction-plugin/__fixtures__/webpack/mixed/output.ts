@@ -8,5 +8,4 @@ export const useClasses = _css({
 });
 export const useClassName = _resetCSS('rjefjbm', 'r7z97ji');
 
-import './code.griffel.css!=!../../../virtual-loader/index.js!./code.ts?safe';
-import './code.griffel.css!=!../../../virtual-loader/index.js!./code.ts?unsafe';
+import './code.griffel.css!=!../../../virtual-loader/index.js!./code.ts';

@@ -1,4 +1,5 @@
 import { defaultCompareMediaQueries, GriffelRenderer } from '@griffel/core';
+import * as path from 'path';
 import { Compilation, NormalModule } from 'webpack';
 import type { Chunk, Compiler, Module, sources } from 'webpack';
 
@@ -13,6 +14,7 @@ const OPTIMIZE_CHUNKS_STAGE_ADVANCED = 10;
 export type GriffelCSSExtractionPluginOptions = {
   compareMediaQueries?: GriffelRenderer['compareMediaQueries'];
   experimental_resetModuleIndexes?: boolean;
+  experimental_enableCssChunks?: boolean;
   unstable_attachToMainEntryPoint?: boolean;
 };
 
@@ -128,6 +130,7 @@ export class GriffelCSSExtractionPlugin {
   private readonly attachToMainEntryPoint: NonNullable<
     GriffelCSSExtractionPluginOptions['unstable_attachToMainEntryPoint']
   >;
+  private readonly enableCssChunks: NonNullable<GriffelCSSExtractionPluginOptions['experimental_enableCssChunks']>;
   private readonly resetModuleIndexes: NonNullable<
     GriffelCSSExtractionPluginOptions['experimental_resetModuleIndexes']
   >;
@@ -135,6 +138,7 @@ export class GriffelCSSExtractionPlugin {
 
   constructor(options?: GriffelCSSExtractionPluginOptions) {
     this.attachToMainEntryPoint = options?.unstable_attachToMainEntryPoint ?? false;
+    this.enableCssChunks = options?.experimental_enableCssChunks ?? false;
     this.resetModuleIndexes = options?.experimental_resetModuleIndexes ?? false;
 
     this.compareMediaQueries = options?.compareMediaQueries ?? defaultCompareMediaQueries;
@@ -165,7 +169,7 @@ export class GriffelCSSExtractionPlugin {
     // WHY?
     //  We need to sort CSS rules in the same order as it's done via style buckets. It's not possible in multiple
     //  chunks.
-    if (compiler.options.optimization.splitChunks) {
+    if (compiler.options.optimization.splitChunks && !this.enableCssChunks) {
       compiler.options.optimization.splitChunks.cacheGroups ??= {};
       compiler.options.optimization.splitChunks.cacheGroups['griffel'] = {
         name: 'griffel',
@@ -182,9 +186,10 @@ export class GriffelCSSExtractionPlugin {
       //   Allows us to register the CSS extracted from Griffel calls to then process in a CSS module
       const cssByModuleMap = new Map<string, string>();
 
-      NormalModule.getCompilationHooks(compilation).loader.tap(PLUGIN_NAME, (loaderContext, module) => {
-        const resourcePath = module.resource;
+      NormalModule.getCompilationHooks(compilation).loader.tap(PLUGIN_NAME, (_loaderContext, module) => {
+        const loaderContext = _loaderContext as SupplementedLoaderContext;
 
+        const resourcePath = module.resource;
         (loaderContext as SupplementedLoaderContext)[GriffelCssLoaderContextKey] = {
           registerExtractedCss(css: string) {
             cssByModuleMap.set(resourcePath, css);
@@ -234,6 +239,24 @@ export class GriffelCSSExtractionPlugin {
           stage: Compilation.PROCESS_ASSETS_STAGE_PRE_PROCESS,
         },
         assets => {
+          if (this.enableCssChunks) {
+            Object.entries(assets).forEach(([assetName, assetSource]) => {
+              if (!assetName.endsWith('.css')) {
+                return;
+              }
+
+              const cssContent = getAssetSourceContents(assetSource);
+              // TODO: Check that content has Griffel CSS
+              const { cssRulesByBucket, remainingCSS } = parseCSSRules(cssContent);
+
+              const [cssSource] = sortCSSRules([cssRulesByBucket], this.compareMediaQueries, this.enableCssChunks);
+
+              compilation.updateAsset(assetName, new compiler.webpack.sources.RawSource(remainingCSS + cssSource));
+            });
+
+            return;
+          }
+
           const griffelChunk = compilation.namedChunks.get('griffel');
 
           if (typeof griffelChunk === 'undefined') {
@@ -251,7 +274,7 @@ export class GriffelCSSExtractionPlugin {
           const cssContent = getAssetSourceContents(cssAssetSource);
           const { cssRulesByBucket, remainingCSS } = parseCSSRules(cssContent);
 
-          const cssSource = sortCSSRules([cssRulesByBucket], this.compareMediaQueries);
+          const [cssSource] = sortCSSRules([cssRulesByBucket], this.compareMediaQueries, this.enableCssChunks);
 
           compilation.updateAsset(cssAssetName, new compiler.webpack.sources.RawSource(remainingCSS + cssSource));
         },

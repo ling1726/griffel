@@ -17,3 +17,4 @@ export const useClassName = __resetStyles('rjefjbm', 'r7z97ji', [
 ]);
 
 import './code.griffel.css!=!../../../virtual-loader/index.js!./code.ts';
+import './code.griffel.css!=!../../../virtual-loader/index.js!./code.ts';

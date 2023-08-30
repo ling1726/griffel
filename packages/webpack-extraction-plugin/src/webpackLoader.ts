@@ -14,6 +14,8 @@ export type WebpackLoaderOptions = {
 
 type WebpackLoaderParams = Parameters<webpack.LoaderDefinitionFunction<WebpackLoaderOptions>>;
 
+const virtualLoaderPath = path.resolve(__dirname, '..', 'virtual-loader', 'index.js');
+
 /**
  * Webpack can also pass sourcemaps as a string, Babel accepts only objects.
  * See https://github.com/babel/babel-loader/pull/889.
@@ -46,10 +48,6 @@ function webpackLoader(
     return;
   }
 
-  if (!this[GriffelCssLoaderContextKey]) {
-    throw new Error('GriffelCSSExtractionPlugin is not configured, please check your webpack config');
-  }
-
   const { unstable_keepOriginalCode } = this.getOptions();
 
   let result: TransformResult | null = null;
@@ -78,20 +76,7 @@ function webpackLoader(
         return;
       }
 
-      const safeCSS = cssRulesByBucket.d
-        ? [
-            `/** @griffel:css-start [d] **/`,
-            cssRulesByBucket?.d?.map(entry => normalizeCSSBucketEntry(entry)).join(''),
-            `/** @griffel:css-end **/`,
-            '',
-          ].join('\n')
-        : '';
-
-      const unsafeCSS = entries.reduce((acc, [cssBucketName, cssBucketRules]) => {
-        if (cssBucketName === 'd') {
-          return acc;
-        }
-
+      const css = entries.reduce((acc, [cssBucketName, cssBucketRules]) => {
         if (cssBucketName === 'm') {
           return (
             acc +
@@ -119,14 +104,13 @@ function webpackLoader(
         );
       }, '');
 
-      this.callback(
-        null,
-        resultCode +
-          '\n\n' +
-          this[GriffelCssLoaderContextKey].createCSSImport('safe', safeCSS) +
-          this[GriffelCssLoaderContextKey].createCSSImport('unsafe', unsafeCSS),
-        resultSourceMap,
-      );
+      const outputFileName = this.resourcePath.replace(/\.[^.]+$/, '.griffel.css');
+
+      this[GriffelCssLoaderContextKey]?.registerExtractedCss(css);
+      const request = `${outputFileName}!=!${virtualLoaderPath}!${this.resourcePath}`;
+      const stringifiedRequest = JSON.stringify(this.utils.contextify(this.context || this.rootContext, request));
+
+      this.callback(null, `${resultCode}\n\nimport ${stringifiedRequest};`, resultSourceMap);
       return;
     }
 
